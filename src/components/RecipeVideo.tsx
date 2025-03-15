@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Volume2, VolumeX, Loader } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 
 interface RecipeVideoProps {
   recipeId: string;
@@ -12,37 +13,64 @@ const RecipeVideo: React.FC<RecipeVideoProps> = ({ recipeId, title }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [videoSequence, setVideoSequence] = useState<string[]>([]);
+  const currentFrameRef = useRef(0);
+  const { toast } = useToast();
   
-  // Mock video URL - in a real application this would come from an AI video generation API
-  const videoUrl = `https://picsum.photos/seed/${recipeId}/1280/720`;
-  
-  // Simulate video loading
+  // Generate a sequence of video frames based on the recipe ID
   useEffect(() => {
+    const generateVideoSequence = () => {
+      // For realistic implementation, this would call an AI video generation API
+      // For now, we'll simulate different frames using seed values
+      const frames = [];
+      // Generate 5 different frames to simulate a video sequence
+      for (let i = 0; i < 5; i++) {
+        frames.push(`https://picsum.photos/seed/${recipeId}-frame-${i}/1280/720`);
+      }
+      setVideoSequence(frames);
+    };
+
+    generateVideoSequence();
+    
+    // Simulate video generation loading
     const timer = setTimeout(() => {
       setIsLoading(false);
+      toast({
+        title: "Recipe Video Generated",
+        description: `AI-generated video for "${title}" is ready to play`,
+        duration: 3000,
+      });
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [recipeId, title, toast]);
   
-  // Simulate video progress when playing
+  // Simulate video playback and frame changes
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (isPlaying && !isLoading) {
+    if (isPlaying && !isLoading && videoSequence.length > 0) {
       interval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 100) {
             setIsPlaying(false);
+            currentFrameRef.current = 0;
             return 0;
           }
+          
+          // Update the current frame for the video sequence
+          const frameIndex = Math.floor((prev / 100) * (videoSequence.length - 1));
+          if (frameIndex !== currentFrameRef.current) {
+            currentFrameRef.current = frameIndex;
+          }
+          
           return prev + 0.5;
         });
       }, 100);
     }
     
     return () => clearInterval(interval);
-  }, [isPlaying, isLoading]);
+  }, [isPlaying, isLoading, videoSequence]);
   
   const togglePlay = () => {
     if (!isLoading) {
@@ -54,21 +82,38 @@ const RecipeVideo: React.FC<RecipeVideoProps> = ({ recipeId, title }) => {
     setIsMuted(!isMuted);
   };
   
+  // Get the current frame based on playback progress
+  const getCurrentFrame = () => {
+    if (videoSequence.length === 0) return '';
+    const frameIndex = Math.min(
+      Math.floor((progress / 100) * videoSequence.length),
+      videoSequence.length - 1
+    );
+    return videoSequence[frameIndex];
+  };
+  
   return (
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-xl">
       {isLoading ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 animate-pulse">
           <Loader className="w-10 h-10 text-primary animate-spin-slow mb-4" />
-          <p className="text-sm text-muted-foreground">Generating AI video...</p>
+          <p className="text-sm text-muted-foreground">Generating AI recipe video for {title}...</p>
         </div>
       ) : (
         <>
           <img 
-            src={videoUrl} 
+            src={getCurrentFrame()} 
             alt={title}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+          
+          {/* Recipe title overlay for context */}
+          <div className="absolute top-4 left-4 right-4">
+            <h3 className="text-lg font-medium text-white text-shadow">
+              {title}
+            </h3>
+          </div>
           
           {/* Video controls */}
           <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col">
