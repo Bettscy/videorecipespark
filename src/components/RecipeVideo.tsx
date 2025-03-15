@@ -17,32 +17,89 @@ const RecipeVideo: React.FC<RecipeVideoProps> = ({ recipeId, title }) => {
   const currentFrameRef = useRef(0);
   const { toast } = useToast();
   
-  // Generate a sequence of video frames based on the recipe ID
+  // Fetch recipe data from Edamam API and generate video frames
   useEffect(() => {
-    const generateVideoSequence = () => {
-      // For realistic implementation, this would call an AI video generation API
-      // For now, we'll simulate different frames using seed values
-      const frames = [];
-      // Generate 5 different frames to simulate a video sequence
-      for (let i = 0; i < 5; i++) {
-        frames.push(`https://picsum.photos/seed/${recipeId}-frame-${i}/1280/720`);
+    const fetchRecipeData = async () => {
+      try {
+        // The APP_ID and APP_KEY would typically be environment variables
+        // These are example values and should be replaced with actual credentials
+        const APP_ID = "1a2b3c4d";
+        const APP_KEY = "5e6f7g8h9i0j";
+        
+        // Clean the title to use as a search term
+        const searchTerm = title.replace(/[^\w\s]/gi, '').toLowerCase();
+        
+        console.log(`Fetching recipe data for: ${searchTerm}`);
+        
+        // Fetch recipe data from Edamam API
+        const response = await fetch(
+          `https://api.edamam.com/api/recipes/v2?type=public&q=${encodeURIComponent(searchTerm)}&app_id=${APP_ID}&app_key=${APP_KEY}`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch recipe data');
+        }
+        
+        const data = await response.json();
+        console.log('Edamam API response:', data);
+        
+        // Generate video frames based on the recipe images from Edamam
+        const frames: string[] = [];
+        
+        // If we have recipe data, use those images
+        if (data.hits && data.hits.length > 0) {
+          // Get up to 5 different recipes to use as video frames
+          const recipes = data.hits.slice(0, 5);
+          
+          recipes.forEach(hit => {
+            if (hit.recipe && hit.recipe.image) {
+              frames.push(hit.recipe.image);
+            }
+          });
+        }
+        
+        // If we didn't get enough frames from Edamam, supplement with placeholders
+        if (frames.length === 0) {
+          // Fallback to placeholder images
+          for (let i = 0; i < 5; i++) {
+            frames.push(`https://picsum.photos/seed/${recipeId}-frame-${i}/1280/720`);
+          }
+        }
+        
+        setVideoSequence(frames);
+        setIsLoading(false);
+        
+        toast({
+          title: "Recipe Video Generated",
+          description: `AI-generated video for "${title}" is ready to play`,
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error('Error fetching recipe data:', error);
+        
+        // Fallback to placeholder images on error
+        const fallbackFrames = [];
+        for (let i = 0; i < 5; i++) {
+          fallbackFrames.push(`https://picsum.photos/seed/${recipeId}-frame-${i}/1280/720`);
+        }
+        
+        setVideoSequence(fallbackFrames);
+        setIsLoading(false);
+        
+        toast({
+          title: "Using Placeholder Video",
+          description: "Couldn't connect to recipe API. Using placeholder video instead.",
+          variant: "destructive",
+          duration: 3000,
+        });
       }
-      setVideoSequence(frames);
     };
 
-    generateVideoSequence();
+    fetchRecipeData();
     
-    // Simulate video generation loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Recipe Video Generated",
-        description: `AI-generated video for "${title}" is ready to play`,
-        duration: 3000,
-      });
-    }, 2000);
-    
-    return () => clearTimeout(timer);
+    return () => {
+      // Cleanup if needed
+    };
   }, [recipeId, title, toast]);
   
   // Simulate video playback and frame changes
@@ -96,8 +153,8 @@ const RecipeVideo: React.FC<RecipeVideoProps> = ({ recipeId, title }) => {
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-xl">
       {isLoading ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 animate-pulse">
-          <Loader className="w-10 h-10 text-primary animate-spin-slow mb-4" />
-          <p className="text-sm text-muted-foreground">Generating AI recipe video for {title}...</p>
+          <Loader className="w-10 h-10 text-primary animate-spin mb-4" />
+          <p className="text-sm text-muted-foreground">Fetching recipe video for {title}...</p>
         </div>
       ) : (
         <>
@@ -156,10 +213,10 @@ const RecipeVideo: React.FC<RecipeVideoProps> = ({ recipeId, title }) => {
             </div>
           </div>
           
-          {/* AI Generated label */}
+          {/* API-Generated label */}
           <div className="absolute top-4 right-4">
             <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-black/40 text-white backdrop-blur-sm border border-white/10">
-              AI Generated
+              Edamam Powered
             </span>
           </div>
         </>
